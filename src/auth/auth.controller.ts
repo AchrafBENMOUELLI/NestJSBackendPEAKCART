@@ -1,13 +1,17 @@
-import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, BadRequestException, Get, Headers, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { createUserSchema } from '../common/dto/create-user.dto';
 import type { CreateUserDto } from '../common/dto/create-user.dto';
 import { loginSchema } from '../common/dto/login.dto';
 import type { LoginDto } from '../common/dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService,
+     private readonly jwtService: JwtService, // Add this
+  ) {}
 
   @Post('register')
   async register(@Body() body: CreateUserDto) {
@@ -30,4 +34,33 @@ export class AuthController {
 
     return await this.authService.login(parsed.data.email, parsed.data.password);
   }
+
+  @Get('me')
+async getMe(@Headers('authorization') auth: string) {
+  console.log('Authorization header:', auth); // ADD THIS
+
+  if (!auth) {
+    throw new UnauthorizedException('No token provided');
+  }
+
+  const token = auth.replace('Bearer ', '');
+  console.log('Extracted token:', token); // ADD THIS
+
+  try {
+    const payload = this.jwtService.verify(token, {
+      secret: process.env.JWT_SECRET || 'secretKey',
+    });
+
+    console.log('Token payload:', payload); // ADD THIS
+
+    return {
+      id: payload.sub,
+      email: payload.email,
+      isVerified: false,
+    };
+  } catch (error) {
+    console.log('Token verification error:', error.message); // ADD THIS
+    throw new UnauthorizedException('Invalid token');
+  }
+}
 }
